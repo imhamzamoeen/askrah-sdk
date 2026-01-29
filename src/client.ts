@@ -2,7 +2,7 @@ import { createJWTManager, type JWTManager } from './auth/jwt'
 import { request } from './utils/http'
 import type { AskRahConfig } from './types/config'
 import type { SignupRequest, ConversionRequest } from './types/requests'
-import type { SignupResponse, ConversionResponse } from './types/responses'
+import type { SignupResponse, ConversionResponse, EventResponse } from './types/responses'
 import { ValidationError } from './errors'
 
 const DEFAULT_BASE_URL = 'https://askrah.com'
@@ -161,6 +161,75 @@ export class AskRahClient {
   }
 
   /**
+   * Send an event to the unified events endpoint
+   *
+   * This is the primary method for sending all event types to AskRah.
+   * Use this for payment, refund, subscription, and dispute events.
+   * For signup events, you can use recordSignup() or this method.
+   *
+   * @param eventType - The event type (payment, refund, subscription.*, dispute.created)
+   * @param payload - Event payload with userId and event-specific data
+   * @returns Event response with event ID and commission details
+   * @throws {ValidationError} If parameters are invalid
+   * @throws {NotFoundError} If user not found (for non-signup events)
+   * @throws {ConflictError} If duplicate eventId
+   * @throws {AuthenticationError} If credentials are invalid
+   *
+   * @example
+   * ```typescript
+   * // Payment event
+   * const result = await client.sendEvent('payment', {
+   *   userId: 'user_123',
+   *   amountCents: 9900,
+   *   currency: 'USD',
+   *   planName: 'Pro Monthly',
+   *   eventId: 'evt_stripe_xxx'
+   * })
+   *
+   * // Refund event
+   * await client.sendEvent('refund', {
+   *   userId: 'user_123',
+   *   amountCents: 9900,
+   *   originalEventId: 'evt_stripe_xxx'
+   * })
+   *
+   * // Subscription event
+   * await client.sendEvent('subscription.created', {
+   *   userId: 'user_123',
+   *   planName: 'Pro Monthly'
+   * })
+   * ```
+   */
+  async sendEvent(
+    eventType: string,
+    payload: Record<string, unknown>
+  ): Promise<EventResponse> {
+    // Validate required userId
+    if (!payload.userId || typeof payload.userId !== 'string') {
+      throw new ValidationError('userId is required and must be a string')
+    }
+
+    const token = await this.jwtManager.getToken()
+    const url = `${this.config.baseUrl}/api/v1/events`
+
+    // Transform payload to API format
+    const body = this.transformEventPayload(eventType, payload)
+
+    const raw = await request<Record<string, unknown>>(
+      url,
+      token,
+      {
+        method: 'POST',
+        body,
+        timeout: this.config.timeout,
+      },
+      this.config.fetch
+    )
+
+    return this.transformEventResponse(raw)
+  }
+
+  /**
    * Force refresh the JWT token
    *
    * Useful if you suspect the token has been invalidated server-side.
@@ -236,5 +305,72 @@ export class AskRahClient {
       eligibleAt: raw.eligible_at as string,
       message: raw.message as string,
     }
+  }
+
+  /**
+   * Transform event payload from camelCase to snake_case API format
+   */
+  private transformEventPayload(
+    eventType: string,
+    payload: Record<string, unknown>
+  ): Record<string, unknown> {
+    const base: Record<string, unknown> = {
+      event: eventType,
+      user_id: payload.userId,
+    }
+
+    // Add ref_code for signup events
+    if (eventType === 'signup' && payload.refCode) {
+      base.ref_code = payload.refCode
+    }
+
+    // Build data object with snake_case keys
+    const data: Record<string, unknown> = {}
+
+    // Map camelCase payload keys to snake_case
+    const keyMapping: Record<string, string> = {
+      amountCents: 'amount_cents',
+      currency: 'currency',
+      planName: 'plan_name',
+      eventId: 'event_id',
+      originalEventId: 'original_event_id',
+      email: 'email',
+    }
+
+    for (const [camelKey, snakeKey] of Object.entries(keyMapping)) {
+      if (payload[camelKey] !== undefined) {
+        data[snakeKey] = payload[camelKey]
+      }
+    }
+
+    // Only include data if it has values
+    if (Object.keys(data).length > 0) {
+      base.data = data
+    }
+
+    return base
+  }
+
+  /**
+   * Transform event response from snake_case to camelCase
+   */
+  private transformEventResponse(raw: Record<string, unknown>): EventResponse {
+    const response: EventResponse = {
+      eventId: (raw.event_id as string | null) ?? null,
+      message: raw.message as string,
+    }
+
+    // Add optional fields if present
+    if (raw.commission_cents !== undefined) {
+      response.commissionCents = raw.commission_cents as number
+    }
+    if (raw.eligible_at !== undefined) {
+      response.eligibleAt = raw.eligible_at as string | null
+    }
+    if (raw.clawback_cents !== undefined) {
+      response.clawbackCents = raw.clawback_cents as number
+    }
+
+    return response
   }
 }
