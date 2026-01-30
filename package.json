@@ -20,14 +20,19 @@
       "types": "./dist/events/index.d.ts",
       "import": "./dist/events/index.mjs",
       "require": "./dist/events/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.mjs",
+      "require": "./dist/server/index.js"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts src/browser/index.ts src/events/index.ts --format cjs,esm --dts --clean",
-    "dev": "tsup src/index.ts src/browser/index.ts src/events/index.ts --format cjs,esm --dts --watch",
+    "build": "tsup src/index.ts src/browser/index.ts src/events/index.ts src/server/index.ts --format cjs,esm --dts --clean",
+    "dev": "tsup src/index.ts src/browser/index.ts src/events/index.ts src/server/index.ts --format cjs,esm --dts --watch",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [

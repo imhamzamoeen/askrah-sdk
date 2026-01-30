@@ -190,3 +190,86 @@ export class AttributionStorage {
     return this.load() !== null
   }
 }
+
+/**
+ * Server-side storage that delegates to an HTTP endpoint for HttpOnly cookie management.
+ * Used when trackEndpoint is configured.
+ */
+export class ServerAttributionStorage {
+  private endpoint: string
+  private debug: boolean
+
+  constructor(endpoint: string, debug: boolean = false) {
+    this.endpoint = endpoint
+    this.debug = debug
+  }
+
+  private log(...args: unknown[]): void {
+    if (this.debug) {
+      console.log('[AskRah]', ...args)
+    }
+  }
+
+  /**
+   * POST the ref data to the server endpoint to set the HttpOnly cookie.
+   */
+  async save(data: AttributionData): Promise<boolean> {
+    this.log('Saving attribution via server:', data)
+    try {
+      const response = await fetch(this.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ref_code: data.ref_code,
+          click_id: data.click_id,
+        }),
+        credentials: 'same-origin',
+      })
+
+      if (!response.ok) {
+        this.log('Server save failed:', response.status)
+        return false
+      }
+
+      this.log('Saved via server successfully')
+      return true
+    } catch (e) {
+      this.log('Server save error:', e)
+      return false
+    }
+  }
+
+  /**
+   * HttpOnly cookie cannot be read by JavaScript.
+   * Use getRefFromRequest() server-side instead.
+   */
+  load(): AttributionData | null {
+    this.log(
+      'Server mode: cookie is HttpOnly, use getRefFromRequest() server-side'
+    )
+    return null
+  }
+
+  /**
+   * Clear the cookie via the server endpoint.
+   */
+  async clear(): Promise<void> {
+    this.log('Clearing attribution via server')
+    try {
+      await fetch(this.endpoint, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      })
+    } catch (e) {
+      this.log('Server clear error:', e)
+    }
+  }
+
+  /**
+   * Cannot determine presence of HttpOnly cookie from JavaScript.
+   */
+  hasData(): boolean {
+    this.log('Server mode: cannot check HttpOnly cookie from JavaScript')
+    return false
+  }
+}

@@ -37,6 +37,21 @@ export interface AskRahBrowserConfig {
    * @default 'click_id'
    */
   clickIdParam?: string
+
+  /**
+   * Server endpoint for secure HttpOnly cookie storage.
+   * When set, the SDK POSTs the ref code to this endpoint instead of
+   * storing it in localStorage/document.cookie.
+   *
+   * The endpoint must be created using createRefHandler() from '@askrah/sdk/server'.
+   *
+   * When using server mode:
+   * - getRefCode() returns null (HttpOnly cookies are not readable by JS)
+   * - Use getRefFromRequest() server-side to read the ref code
+   *
+   * @example '/api/askrah/ref'
+   */
+  trackEndpoint?: string
 }
 
 /**
