@@ -27,7 +27,7 @@ export interface ConversionEventPayload {
   planName?: string
   /** Additional description */
   description?: string
-  /** Unique event ID to prevent duplicates (e.g., Stripe event ID) */
+  /** Unique event ID to prevent duplicates (e.g., Upgate transaction ID) */
   eventId?: string
 }
 
@@ -43,7 +43,7 @@ export interface PaymentEventPayload {
   currency?: string
   /** Plan or product name */
   planName?: string
-  /** Unique event ID to prevent duplicates (e.g., Stripe event ID) */
+  /** Unique event ID to prevent duplicates (e.g., Upgate transaction ID) */
   eventId?: string
 }
 
@@ -122,7 +122,7 @@ export interface DisputeEventPayload {
   userId: string
   /** Disputed amount in cents */
   amountCents: number
-  /** Unique event ID to prevent duplicates (e.g., Stripe dispute ID) */
+  /** Unique event ID to prevent duplicates (e.g., Upgate transaction ID) */
   eventId?: string
 }
 
